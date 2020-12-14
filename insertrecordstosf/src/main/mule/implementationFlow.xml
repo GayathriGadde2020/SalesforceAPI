@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<file:config name="File_Config" doc:name="File Config" doc:id="33906c9d-1775-4799-8657-20fec47fb9ec" >
+		<file:connection workingDir="C:\Users\gayat\Desktop\InsertRecords failed" />
+	</file:config>
+	<flow name="implementationFlow" doc:id="7354b4a5-21d5-43f3-858e-6865f8d6f4aa" >
+		<ee:transform doc:name="convert into Salesforce account" doc:id="c50be322-f557-40d6-8d41-a287b043b7cc" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv header=true
+---
+payload map {
+	Name: $.Name,
+	BillingStreet: $.BillingStreet,
+	ShippingStreet: $.ShippingStreet,
+	Phone: $.Phone
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="implementationFlowBatch_Job" doc:id="bdf7715c-72af-4019-975e-149eb3afe81d" blockSize="500" maxFailedRecords="-1">
+			<batch:process-records >
+				<batch:step name="SuccessRecords" doc:id="9a4f658f-c3ba-4fde-8c9c-1a3786761af7" >
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="7e29c272-bdf8-4cce-aac2-cb0759045b2c" size="500">
+						<salesforce:upsert objectType="Account" externalIdFieldName="Id" doc:name="Upsert" doc:id="aa8b595c-44c8-4bc6-8734-b065cfcb5e0d" config-ref="Salesforce_Config" target="Output"/>
+						<ee:transform doc:name="Transform Message" doc:id="bc6325a1-503b-4a40-a408-2f36e55b7615" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.Output]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="FailedRecords" doc:id="bbc5699b-b530-4173-be21-3f2490a2efb2" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="6bc20997-02d8-4eb3-8896-cd47e4f1383d" size="500">
+						<ee:transform doc:name="Transform Message" doc:id="d088577a-5601-438e-a37f-ecdb7fb22b10">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+Batch::getStepExceptions()]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+						<logger level="INFO" doc:name="Logger" doc:id="fa6592c2-e0a3-446e-849b-c6a1e372e80c" message="#[payload]"/>
+						<file:write doc:id="be916dea-6887-43f8-9a7b-b7f31142e814" doc:name="Failed Records" config-ref="File_Config" path="failedRecords" />
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete >
+				<logger level="INFO" doc:name="Logger" doc:id="b276628a-70cf-4387-b70e-5e36822db2a7" message="Job instance completed"/>
+			</batch:on-complete>
+		</batch:job>
+	</flow>
+</mule>

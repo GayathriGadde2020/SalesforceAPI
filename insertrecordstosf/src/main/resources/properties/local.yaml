@@ -1,0 +1,8 @@
+http:
+  port: "8082"
+sfdc:
+  username: "ggadde@openlogix.com"
+  password: "Gaya3@salesforce"
+  token: "Ro8kSTyQFHHybWjELopRLKUP"
+  url: "https://login.salesforce.com/services/Soap/u/49.0"
+  
